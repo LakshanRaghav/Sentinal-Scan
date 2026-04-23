@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as cheerio from 'cheerio';
+import { load as loadCheerio } from 'cheerio';
 import https from 'https';
 
 // Disable SSL verification for testing (not recommended for production)
@@ -131,7 +131,7 @@ async function crawlWebsite(baseUrl) {
         }
       });
 
-      const $ = cheerio.load(response.data);
+      const $ = loadCheerio(response.data);
       const pageText = response.data;
 
       // Extract secrets
