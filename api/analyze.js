@@ -117,7 +117,7 @@ async function crawlWebsite(baseUrl) {
   const findings = [];
   const startTime = Date.now();
 
-  while (toVisit.length > 0 && visited.size < 50) { // Limit to 50 pages
+  while (toVisit.length > 0 && visited.size < 20) { // Limit to 20 pages for Vercel stability
     const url = toVisit.shift();
     if (visited.has(url)) continue;
     visited.add(url);

@@ -1,18 +1,9 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/analyze.js",
-      "use": "@vercel/node"
-    }
-  ],
+  "buildCommand": "echo 'No build needed'",
+  "outputDirectory": ".",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
