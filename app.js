@@ -368,3 +368,10 @@ btnScan.addEventListener('click', () => {
         logTerminal("Error: Target URL required.", "error");
     }
 });
+
+urlInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        btnScan.click();
+    }
+});
