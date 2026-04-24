@@ -258,6 +258,10 @@ function renderDashboard(report) {
     execSummaryText.innerText = report.executive_summary;
     verdictText.innerText = report.risk_verdict;
     priorityAction.innerText = report.priority_action;
+    
+    if (document.getElementById('comp-pci')) document.getElementById('comp-pci').innerText = report.compliance_impact?.pci_dss || 'N/A';
+    if (document.getElementById('comp-gdpr')) document.getElementById('comp-gdpr').innerText = report.compliance_impact?.gdpr || 'N/A';
+    if (document.getElementById('comp-iso')) document.getElementById('comp-iso').innerText = report.compliance_impact?.iso_27001 || 'N/A';
 
     riskScore.innerText = report.risk_score;
     riskLabel.innerText = report.overall_severity;
@@ -277,7 +281,7 @@ function renderDashboard(report) {
     }
 
     report.findings.forEach(vuln => {
-        if (!vuln.title || vuln.title.toLowerCase() === 'none' || vuln.what_it_is.toLowerCase() === 'none') return;
+        if (!vuln.title || vuln.title.toLowerCase() === 'none') return;
 
         const card = document.createElement('div');
         let sevClass = 'low';
@@ -292,24 +296,24 @@ function renderDashboard(report) {
             <div class="finding-header">
                 <div>
                     <h4 class="finding-title">${vuln.title}</h4>
-                    <span class="finding-badge ${sevClass}">${vuln.severity}</span>
+                    <span class="finding-badge ${sevClass}">${vuln.severity} ${vuln.cvss_score ? \`(CVSS: \${vuln.cvss_score})\` : ''}</span>
+                    ${vuln.cwe_id ? \`<span class="finding-badge info">\${vuln.cwe_id}</span>\` : ''}
                 </div>
                 <i data-lucide="${sevClass === 'critical' ? 'alert-octagon' : sevClass === 'high' ? 'alert-triangle' : 'info'}"></i>
             </div>
-            <p class="finding-desc">${vuln.what_it_is}</p>
-            <p class="finding-why">"${vuln.why_dangerous}"</p>
-            ${vuln.exposed_value_preview ? `<div class="finding-preview">Evidence: ${vuln.exposed_value_preview}</div>` : ''}
-            ${vuln.location ? `<div class="finding-location" style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);"><strong>Location:</strong> ${vuln.location}</div>` : ''}
-            ${(vuln.fix_steps && vuln.fix_steps.length > 0) ? `<button class="btn-fix" style="margin-top: 15px;">REMEDIATION</button>` : ''}
+            <p class="finding-desc">${vuln.impact || 'No description provided.'}</p>
+            ${vuln.evidence ? \`<div class="finding-preview" style="font-family: monospace;">Evidence: \${JSON.stringify(vuln.evidence)}</div>\` : ''}
+            ${vuln.affected_component ? \`<div class="finding-location" style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);"><strong>Location:</strong> \${vuln.affected_component}</div>\` : ''}
+            ${(vuln.remediation && vuln.remediation.length > 0) ? \`<button class="btn-fix" style="margin-top: 15px;">REMEDIATION</button>\` : ''}
         `;
 
         const fixBtn = card.querySelector('.btn-fix');
         if (fixBtn) {
             fixBtn.addEventListener('click', () => {
                 modalTitle.innerText = vuln.title;
-                modalTime.innerText = vuln.fix_time || 'N/A';
+                modalTime.innerText = vuln.owasp_category || 'N/A';
                 modalTitle.style.color = `var(--neon-${sevClass === 'critical' ? 'red' : sevClass === 'high' ? 'orange' : 'cyan'})`;
-                modalSteps.innerHTML = vuln.fix_steps.map(step => `<li>${step}</li>`).join('');
+                modalSteps.innerHTML = vuln.remediation.map(step => `<li>${step}</li>`).join('');
                 modal.classList.remove('hidden');
             });
         }

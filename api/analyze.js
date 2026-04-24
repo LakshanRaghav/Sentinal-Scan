@@ -1,35 +1,45 @@
 import axios from 'axios';
 
 const SYSTEM_PROMPT = `
-You are SentinelScan's AI Security Analyst. Your job is to analyze the raw JSON reconnaissance data provided (Headers, DNS, SSL, Subdomains, Tech Stack, DAST) and produce a structured, easy-to-understand executive report.
+You are SentinelScan's AI Security Analyst. Your job is to analyze the raw JSON reconnaissance data provided (Headers, DNS, SSL, Subdomains, Tech Stack, DAST) and produce a structured, industry-standard penetration testing report.
 
 CORE RULES:
-1. Synthesize the findings. If multiple checks flag the same issue (e.g. missing Secure cookie and missing HSTS), group them into a coherent narrative.
-2. Provide simple explanations without jargon, then a "why_dangerous", and "fix_steps".
-3. Use the STRICT TRAFFIC LIGHT severity system ONLY:
-   - RED: Immediate Danger (Fix within 1 hour). Example: SQLi, XSS, Expired SSL, Open .env.
-   - YELLOW: Potential Threat (Fix within 24 hours). Example: Missing DMARC, Overly Permissive CORS.
-   - BLUE: Informational Recon or Hygiene. Example: Missing Security Headers (CSP, HSTS), Insecure Cookies, Server Headers, found subdomains, valid SSL.
-4. If there are NO major vulnerabilities (RED) or significant threats (YELLOW), rate the overall severity as BLUE. Do NOT hallucinate. Do NOT call missing headers or cookies "critical vulnerabilities" - they are just hygiene findings.
-5. Trust the provided JSON data. Do not invent vulnerabilities that aren't in the input.
+1. Synthesize the findings. Group related vulnerabilities into coherent narratives.
+2. Provide simple, impact-focused explanations.
+3. Derive CVSS 3.1 base scores (0.0 to 10.0) from the raw data severity.
+4. Map each finding to the closest CWE ID and OWASP Top 10 category.
+5. Trust the provided JSON data. Do not invent vulnerabilities.
+6. Missing headers or missing cookies are NOT critical vulnerabilities; they are "informational" or "low".
 
-OUTPUT FORMAT — ALWAYS RESPOND IN EXACT JSON STRUCTURE ONLY. DO NOT WRAP THE RESPONSE IN MARKDOWN BACKTICKS (e.g. \`\`\`json). JUST RETURN THE RAW JSON OBJECT.
+OUTPUT FORMAT — ALWAYS RESPOND IN EXACT JSON STRUCTURE ONLY. NO MARKDOWN. NO PREAMBLE.
 {
-  "executive_summary": "plain English, 3-4 sentences summarizing the security posture.",
+  "executive_summary": "Plain English, 3-4 sentences summarizing the security posture.",
   "risk_score": 85,
-  "risk_verdict": "Your site has critical vulnerabilities. Fix immediately.",
-  "overall_severity": "RED",
-  "priority_action": "Single most important action (e.g., Fix SQL injection on /login)",
+  "risk_verdict": "CRITICAL RISK",
+  "overall_severity": "critical",
+  "priority_action": "Fix SQL injection on /login",
+  "severity_breakdown": { "critical": 1, "high": 0, "medium": 1, "low": 2, "informational": 5 },
+  "compliance_impact": { 
+    "pci_dss": "Non-compliant due to weak TLS", 
+    "gdpr": "Potential non-compliance due to PII exposure risk", 
+    "iso_27001": "Fails A.14.2.5 due to missing secure engineering principles" 
+  },
   "findings": [
     {
-      "title": "short title",
-      "severity": "RED",
-      "what_it_is": "explanation",
-      "why_dangerous": "real-world consequence",
-      "exposed_value_preview": "Snippet or evidence if applicable",
-      "location": "URL or Component",
-      "fix_steps": ["Step 1", "Step 2"],
-      "fix_time": "15 minutes"
+      "id": "VULN-001",
+      "title": "Short title",
+      "severity": "critical",
+      "cvss_score": 9.8,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+      "cwe_id": "CWE-89",
+      "cve": null,
+      "owasp_category": "A03:2021-Injection",
+      "module": "DAST",
+      "affected_component": "example.com",
+      "impact": "Explanation of real-world consequence",
+      "remediation": ["Step 1", "Step 2"],
+      "evidence": { "Payload": "?id=1' OR 1=1--" },
+      "compliance_tags": ["PCI-DSS", "ISO-27001"]
     }
   ]
 }
@@ -37,9 +47,7 @@ OUTPUT FORMAT — ALWAYS RESPOND IN EXACT JSON STRUCTURE ONLY. DO NOT WRAP THE R
 
 async function callNvidiaAPI(scanData) {
   const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) {
-    throw new Error('NVIDIA_API_KEY not set');
-  }
+  if (!apiKey) throw new Error('NVIDIA_API_KEY not set');
 
   const response = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
     model: "meta/llama-3.1-70b-instruct",
@@ -48,7 +56,7 @@ async function callNvidiaAPI(scanData) {
       { role: "user", content: `Analyze this aggregated security scan data: ${JSON.stringify(scanData)}` }
     ],
     temperature: 0.2,
-    max_tokens: 3000
+    max_tokens: 4000
   }, {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -77,7 +85,6 @@ export default async (req, res) => {
     const aiResponse = await callNvidiaAPI({ target: targetUrl, data: aggregatedData });
     let report;
     try {
-      // Strip markdown JSON wrapping if the AI ignored instructions
       let cleanResponse = aiResponse.trim();
       if (cleanResponse.startsWith('```json')) cleanResponse = cleanResponse.substring(7);
       if (cleanResponse.startsWith('```')) cleanResponse = cleanResponse.substring(3);
@@ -90,8 +97,10 @@ export default async (req, res) => {
         executive_summary: "AI analysis completed but returned invalid format. See logs.",
         risk_score: 50,
         risk_verdict: "Unable to determine risk level.",
-        overall_severity: "BLUE",
+        overall_severity: "info",
         priority_action: "Review scan manually",
+        severity_breakdown: { critical: 0, high: 0, medium: 0, low: 0, informational: 0 },
+        compliance_impact: { pci_dss: "Unknown", gdpr: "Unknown", iso_27001: "Unknown" },
         findings: []
       };
     }

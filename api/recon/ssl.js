@@ -1,4 +1,5 @@
-import https from 'https';
+import tls from 'tls';
+import { URL } from 'url';
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -6,86 +7,103 @@ export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { targetUrl } = req.body;
-  if (!targetUrl) {
-    return res.status(400).json({ error: 'targetUrl required' });
+  if (!targetUrl) return res.status(400).json({ error: 'targetUrl required' });
+
+  let hostname;
+  try {
+    const parsed = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
+    hostname = parsed.hostname;
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL' });
   }
 
+  const findings = [];
+  let sslInfo = {};
+
   try {
-    const urlObj = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
-    if (urlObj.protocol !== 'https:') {
-      return res.status(200).json({ 
-        success: true, 
-        findings: [{ title: 'No HTTPS', severity: 'RED', what_it_is: 'Target is not using HTTPS.', why_dangerous: 'All traffic is sent in cleartext.', fix_steps: ['Install an SSL/TLS certificate.'] }]
-      });
-    }
+    // 1. Standard TLS check (cert info, protocol, ocsp)
+    await new Promise((resolve, reject) => {
+      const socket = tls.connect(443, hostname, { servername: hostname, requestOCSP: true }, () => {
+        const cert = socket.getPeerCertificate(true);
+        const protocol = socket.getProtocol();
 
-    const options = {
-      host: urlObj.hostname,
-      port: urlObj.port || 443,
-      method: 'GET',
-      rejectUnauthorized: false, // We want to inspect it even if invalid
-    };
+        sslInfo = {
+          issuer: cert.issuer?.O || 'Unknown',
+          subject: cert.subject?.CN || 'Unknown',
+          valid_from: cert.valid_from,
+          valid_to: cert.valid_to,
+          protocol
+        };
 
-    const sslData = await new Promise((resolve, reject) => {
-      const request = https.request(options, (response) => {
-        const cert = response.socket.getPeerCertificate(true);
-        const protocol = response.socket.getProtocol();
-        resolve({ cert, protocol, authorized: response.socket.authorized, authError: response.socket.authorizationError });
+        const daysToExpiry = Math.floor((new Date(cert.valid_to) - new Date()) / (1000 * 60 * 60 * 24));
+        if (daysToExpiry < 0) {
+          findings.push({ title: 'SSL Certificate Expired', severity: 'RED', what_it_is: 'The SSL certificate has expired.', why_dangerous: 'Browsers will block users from visiting the site, and traffic is vulnerable to interception.', fix_steps: ['Renew and install a valid SSL certificate immediately.'] });
+        } else if (daysToExpiry < 30) {
+          findings.push({ title: 'SSL Certificate Expiring Soon', severity: 'YELLOW', what_it_is: `The certificate expires in ${daysToExpiry} days.`, why_dangerous: 'If not renewed, the site will become inaccessible.', fix_steps: ['Renew the certificate before it expires.'] });
+        } else {
+          findings.push({ title: 'Valid SSL Certificate', severity: 'BLUE', what_it_is: 'The certificate is valid.', why_dangerous: 'Informational', fix_steps: [] });
+        }
+
+        if (protocol === 'TLSv1' || protocol === 'TLSv1.1') {
+          findings.push({ title: 'Obsolete TLS Protocol', severity: 'RED', what_it_is: `Server negotiated ${protocol}`, why_dangerous: 'Vulnerable to downgrade attacks like POODLE and BEAST.', fix_steps: ['Disable TLS 1.0 and 1.1 on the server.'] });
+        } else {
+          findings.push({ title: 'Modern TLS Supported', severity: 'BLUE', what_it_is: `Server negotiated ${protocol}`, why_dangerous: 'Informational', fix_steps: [] });
+        }
+
+        socket.end();
+        resolve();
       });
 
-      request.on('error', reject);
-      request.setTimeout(5000, () => {
-        request.destroy();
-        reject(new Error('Timeout'));
+      // OCSP Stapling check
+      socket.on('OCSPResponse', (response) => {
+        if (!response || response.length === 0) {
+          findings.push({ type: 'ocsp_not_stapled', title: 'OCSP Stapling Not Enabled', severity: 'BLUE', what_it_is: 'The server does not staple OCSP responses.', why_dangerous: 'Clients must query the CA directly to verify revocation, slowing down connections and leaking privacy.', fix_steps: ['Enable OCSP stapling in the web server.'] });
+        }
       });
-      request.end();
+
+      socket.on('error', reject);
     });
 
-    const findings = [];
-    const { cert, protocol, authorized, authError } = sslData;
-
-    if (!authorized) {
-      findings.push({ title: 'Invalid SSL Certificate', severity: 'RED', what_it_is: `Certificate is invalid: ${authError}`, why_dangerous: 'Users will see browser warnings. MITM attacks possible.', fix_steps: ['Renew or fix certificate installation.'] });
-    }
-
-    // Check expiry
-    const validTo = new Date(cert.valid_to);
-    const daysRemaining = (validTo - new Date()) / (1000 * 60 * 60 * 24);
+    // 2. Cipher Suite Enumeration (Weak Ciphers)
+    const weakCiphers = ['RC4', 'DES', '3DES', 'NULL', 'EXPORT', 'ANON'];
     
-    if (daysRemaining < 0) {
-      findings.push({ title: 'Expired SSL Certificate', severity: 'RED', what_it_is: `Certificate expired on ${cert.valid_to}`, why_dangerous: 'Browsers will block access.', fix_steps: ['Renew the certificate immediately.'] });
-    } else if (daysRemaining < 30) {
-      findings.push({ title: 'SSL Expiring Soon', severity: 'YELLOW', what_it_is: `Certificate expires in ${Math.round(daysRemaining)} days.`, why_dangerous: 'Site will become inaccessible soon.', fix_steps: ['Renew the certificate.'] });
+    // Test each weak cipher class to see if the server accepts it
+    for (const cipher of weakCiphers) {
+      try {
+        await new Promise((resolve, reject) => {
+          const socket = tls.connect(443, hostname, { 
+            servername: hostname, 
+            ciphers: cipher, // Try to force weak cipher
+            rejectUnauthorized: false
+          }, () => {
+            // If connection succeeds, it means it accepted the weak cipher
+            const negotiated = socket.getCipher();
+            findings.push({ 
+              type: 'cipher_weak', 
+              title: `Weak Cipher Suite Accepted (${cipher})`, 
+              severity: 'YELLOW', 
+              what_it_is: `Server accepted a ${cipher} cipher suite (${negotiated.name}).`, 
+              why_dangerous: 'Weak ciphers are vulnerable to cryptographic attacks allowing traffic decryption.', 
+              fix_steps: [`Disable ${cipher} cipher suites in web server configuration.`] 
+            });
+            socket.end();
+            resolve();
+          });
+          socket.on('error', () => {
+            // Error means connection refused/handshake failed (good!)
+            resolve();
+          });
+        });
+      } catch (e) {} // Ignore errors, means cipher rejected
     }
 
-    // Check Protocol
-    if (protocol === 'TLSv1.0' || protocol === 'TLSv1.1') {
-      findings.push({ title: 'Obsolete TLS Version', severity: 'RED', what_it_is: `Server is using ${protocol}.`, why_dangerous: 'Vulnerable to known attacks (e.g., POODLE, BEAST).', fix_steps: ['Disable TLS 1.0 and 1.1 on the server.'] });
-    } else {
-      findings.push({ title: 'Modern TLS Supported', severity: 'BLUE', what_it_is: `Server negotiated ${protocol}.`, why_dangerous: 'Informational' });
-    }
-
-    return res.status(200).json({ 
-      success: true, 
-      findings, 
-      sslInfo: { 
-        issuer: cert.issuer?.O || 'Unknown', 
-        subject: cert.subject?.CN || 'Unknown', 
-        validTo: cert.valid_to,
-        protocol 
-      } 
-    });
+    return res.status(200).json({ success: true, sslInfo, findings });
 
   } catch (error) {
-    return res.status(500).json({ error: `SSL scan failed: ${error.message}` });
+    return res.status(200).json({ success: false, sslInfo, findings: [{ title: 'SSL Audit Failed', severity: 'RED', what_it_is: 'Could not establish TLS connection.', why_dangerous: 'Server might be offline or not supporting HTTPS.', fix_steps: ['Ensure HTTPS is accessible.'] }] });
   }
 };
