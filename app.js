@@ -344,15 +344,15 @@ function renderDashboard(report) {
             const maxCat = Math.max(...Object.values(categories));
             for (const [cat, count] of Object.entries(categories).sort((a,b) => b[1] - a[1])) {
                 const pct = Math.max(5, Math.floor((count / maxCat) * 100));
-                const barHTML = \`
+                const barHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #fff; margin-bottom: 4px;">
-                        <span style="flex: 1; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; padding-right: 10px;">\${cat}</span>
-                        <span style="width: 30px; text-align: right;">\${count}</span>
+                        <span style="flex: 1; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; padding-right: 10px;">${cat}</span>
+                        <span style="width: 30px; text-align: right;">${count}</span>
                     </div>
                     <div style="width: 100%; background: var(--surface-elevated); height: 12px; border-radius: 4px; overflow: hidden;">
-                        <div style="width: \${pct}%; height: 100%; background: var(--neon-cyan); border-radius: 4px;"></div>
+                        <div style="width: ${pct}%; height: 100%; background: var(--neon-cyan); border-radius: 4px;"></div>
                     </div>
-                \`;
+                `;
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = barHTML;
                 threatChart.appendChild(wrapper);
