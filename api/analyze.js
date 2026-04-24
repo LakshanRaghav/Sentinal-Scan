@@ -10,6 +10,7 @@ CORE RULES:
 4. Map each finding to the closest CWE ID and OWASP Top 10 category.
 5. Trust the provided JSON data. Do not invent vulnerabilities.
 6. Missing headers or missing cookies are NOT critical vulnerabilities; they are "informational" or "low".
+7. CRITICAL: You MUST list EVERY technical finding found in the RAW DATA as a distinct item in the "findings" array. DO NOT summarize multiple technical issues into a single generic finding. Preserve exact payloads, paths, and technical context.
 
 OUTPUT FORMAT — ALWAYS RESPOND IN EXACT JSON STRUCTURE ONLY. NO MARKDOWN. NO PREAMBLE.
 {
