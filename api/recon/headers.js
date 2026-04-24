@@ -53,8 +53,8 @@ export default async (req, res) => {
       }
     };
 
-    checkHeader('Content-Security-Policy', true, 'YELLOW', 'Mitigates XSS and data injection attacks by restricting resource origins.', 'The Content-Security-Policy header is completely missing.');
-    checkHeader('Strict-Transport-Security', targetUrl.startsWith('https'), 'YELLOW', 'Enforces secure (HTTP over SSL/TLS) connections to the server.', 'The HSTS header is missing, leaving the site vulnerable to downgrade attacks.');
+    checkHeader('Content-Security-Policy', true, 'BLUE', 'Mitigates XSS and data injection attacks by restricting resource origins.', 'The Content-Security-Policy header is completely missing.');
+    checkHeader('Strict-Transport-Security', targetUrl.startsWith('https'), 'BLUE', 'Enforces secure (HTTP over SSL/TLS) connections to the server.', 'The HSTS header is missing, leaving the site vulnerable to downgrade attacks.');
     checkHeader('X-Frame-Options', true, 'BLUE', 'Protects against clickjacking attacks by controlling whether the site can be framed.', 'The X-Frame-Options header is missing.');
     checkHeader('X-Content-Type-Options', true, 'BLUE', 'Prevents MIME-sniffing attacks.', 'The X-Content-Type-Options header is missing.');
     checkHeader('Referrer-Policy', true, 'BLUE', 'Controls how much referrer information is included with requests.', 'The Referrer-Policy header is missing.');
@@ -64,10 +64,10 @@ export default async (req, res) => {
     if (setCookie) {
       setCookie.forEach(cookie => {
         if (!cookie.toLowerCase().includes('secure') && targetUrl.startsWith('https')) {
-          findings.push({ title: 'Insecure Cookie', severity: 'YELLOW', what_it_is: 'A cookie is set without the Secure attribute.', why_dangerous: 'The cookie can be transmitted in cleartext over unencrypted HTTP connections.' });
+          findings.push({ title: 'Insecure Cookie', severity: 'BLUE', what_it_is: 'A cookie is set without the Secure attribute.', why_dangerous: 'The cookie can be transmitted in cleartext over unencrypted HTTP connections.' });
         }
         if (!cookie.toLowerCase().includes('httponly')) {
-          findings.push({ title: 'Missing HttpOnly Cookie', severity: 'YELLOW', what_it_is: 'A cookie is set without the HttpOnly attribute.', why_dangerous: 'The cookie can be accessed via client-side scripts, increasing XSS risk.' });
+          findings.push({ title: 'Missing HttpOnly Cookie', severity: 'BLUE', what_it_is: 'A cookie is set without the HttpOnly attribute.', why_dangerous: 'The cookie can be accessed via client-side scripts, increasing XSS risk.' });
         }
         if (!cookie.toLowerCase().includes('samesite')) {
           findings.push({ title: 'Missing SameSite Cookie Attribute', severity: 'BLUE', what_it_is: 'A cookie is set without the SameSite attribute.', why_dangerous: 'This increases the risk of Cross-Site Request Forgery (CSRF) attacks.' });
