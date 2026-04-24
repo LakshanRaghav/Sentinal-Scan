@@ -338,22 +338,24 @@ function renderDashboard(report) {
 // --- PDF EXPORT ---
 btnExportPdf.addEventListener('click', () => {
     const element = document.getElementById('dashboard-content');
+    
+    element.classList.add('pdf-export-mode');
+    
     const opt = {
-      margin:       0.5,
+      margin:       [0.5, 0.5, 0.5, 0.5],
       filename:     'SentinelScan_Report.pdf',
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#09090b' },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#09090b', windowWidth: 1200 },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
     
-    // Temporarily adjust styles for better PDF output
     const originalBg = element.style.background;
     element.style.background = '#09090b';
-    element.style.padding = '20px';
     
     html2pdf().set(opt).from(element).save().then(() => {
         element.style.background = originalBg;
-        element.style.padding = '0';
+        element.classList.remove('pdf-export-mode');
     });
 });
 

@@ -518,3 +518,100 @@ nav a:hover, nav a.active {
     border-top: 1px solid var(--border-color);
     color: var(--text-muted);
 }
+
+/* ================= RESPONSIVE LAYOUT ================= */
+@media (max-width: 1024px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    .executive-summary-card {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 768px) {
+    #app-container {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 16px;
+    }
+    .logo-area {
+        margin-bottom: 20px;
+    }
+    nav {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+    }
+    nav a {
+        margin-bottom: 0;
+        white-space: nowrap;
+    }
+    .main-content {
+        padding: 16px;
+        overflow-y: visible;
+    }
+    .input-group {
+        flex-direction: column;
+        gap: 10px;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+    }
+    .input-group input {
+        width: 100%;
+        background-color: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+    }
+    .input-group button {
+        width: 100%;
+    }
+    .findings-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ================= PDF EXPORT STYLES ================= */
+.pdf-export-mode {
+    width: 1000px !important;
+    padding: 20px !important;
+    background: #09090b !important;
+}
+
+.pdf-export-mode .finding-card,
+.pdf-export-mode .executive-summary-card,
+.pdf-export-mode .metric-card,
+.pdf-export-mode .stat-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+}
+
+.pdf-export-mode .findings-grid {
+    display: block !important;
+}
+
+.pdf-export-mode .finding-card {
+    margin-bottom: 20px !important;
+    width: 100% !important;
+}
+
+.pdf-export-mode .metrics-grid {
+    display: flex !important;
+    gap: 20px !important;
+}
+
+.pdf-export-mode .metric-card {
+    flex: 1 !important;
+}
+
+.pdf-export-mode .stats-area {
+    flex: 2 !important;
+}
