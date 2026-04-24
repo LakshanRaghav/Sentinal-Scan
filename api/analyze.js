@@ -42,7 +42,7 @@ async function callNvidiaAPI(scanData) {
   }
 
   const response = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-    model: "meta/llama-3.1-405b-instruct",
+    model: "meta/llama-3.1-70b-instruct",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: `Analyze this aggregated security scan data: ${JSON.stringify(scanData)}` }
