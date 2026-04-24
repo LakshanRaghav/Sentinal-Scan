@@ -89,7 +89,8 @@ function logTerminal(message, type = '') {
 // --- SCAN ORCHESTRATOR ---
 async function performScan(url) {
     btnScan.disabled = true;
-    btnScan.innerText = "SCANNING...";
+    btnScan.innerHTML = '<i data-lucide="loader" class="spin"></i> SCANNING...';
+    lucide.createIcons();
     terminalLogs.innerHTML = '';
     progressBar.style.width = '0%';
     
@@ -194,14 +195,15 @@ async function performScan(url) {
         }, 1000);
 
     } catch (error) {
-        logTerminal(\`SCAN FAILED: \${error.message}\`, 'error');
+        logTerminal(`SCAN FAILED: ${error.message}`, 'error');
     }
 
     const dinoContainer = document.getElementById('dino-container');
     if (dinoContainer) dinoContainer.classList.add('hidden');
 
     btnScan.disabled = false;
-    btnScan.innerText = "INITIATE SCAN";
+    btnScan.innerHTML = '<i data-lucide="zap"></i> INITIATE SCAN';
+    lucide.createIcons();
 }
 
 // --- ARCHIVE SYSTEM ---
@@ -302,15 +304,15 @@ function renderDashboard(report) {
             <div class="finding-header">
                 <div>
                     <h4 class="finding-title">${vuln.title}</h4>
-                    <span class="finding-badge ${sevClass}">${vuln.severity} ${vuln.cvss_score ? \`(CVSS: \${vuln.cvss_score})\` : ''}</span>
-                    ${vuln.cwe_id ? \`<span class="finding-badge info">\${vuln.cwe_id}</span>\` : ''}
+                    <span class="finding-badge ${sevClass}">${vuln.severity} ${vuln.cvss_score ? `(CVSS: ${vuln.cvss_score})` : ''}</span>
+                    ${vuln.cwe_id ? `<span class="finding-badge info">${vuln.cwe_id}</span>` : ''}
                 </div>
                 <i data-lucide="${sevClass === 'critical' ? 'alert-octagon' : sevClass === 'high' ? 'alert-triangle' : 'info'}"></i>
             </div>
             <p class="finding-desc">${vuln.impact || 'No description provided.'}</p>
-            ${vuln.evidence ? \`<div class="finding-preview" style="font-family: monospace;">Evidence: \${JSON.stringify(vuln.evidence)}</div>\` : ''}
-            ${vuln.affected_component ? \`<div class="finding-location" style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);"><strong>Location:</strong> \${vuln.affected_component}</div>\` : ''}
-            ${(vuln.remediation && vuln.remediation.length > 0) ? \`<button class="btn-fix" style="margin-top: 15px;">REMEDIATION</button>\` : ''}
+            ${vuln.evidence ? `<div class="finding-preview" style="font-family: monospace;">Evidence: ${JSON.stringify(vuln.evidence)}</div>` : ''}
+            ${vuln.affected_component ? `<div class="finding-location" style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);"><strong>Location:</strong> ${vuln.affected_component}</div>` : ''}
+            ${(vuln.remediation && vuln.remediation.length > 0) ? `<button class="btn-fix" style="margin-top: 15px;"><i data-lucide="wrench"></i> REMEDIATION</button>` : ''}
         `;
 
         const fixBtn = card.querySelector('.btn-fix');
