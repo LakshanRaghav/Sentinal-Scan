@@ -500,3 +500,111 @@ nav a:hover, nav a.active {
     border-top: 1px solid var(--border-color);
     color: var(--text-muted);
 }
+
+/* --- New V2.0 Styles --- */
+
+/* Dashboard Top Actions */
+.dashboard-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+}
+
+.btn-secondary {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+/* Finding Cards Re-style */
+.finding-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+.finding-body strong { color: var(--text-main); }
+
+.finding-card.severity-red { border-color: var(--neon-red); }
+.finding-card.severity-yellow { border-color: var(--neon-orange); }
+.finding-card.severity-blue { border-color: var(--neon-blue); }
+
+.badge.red { background: rgba(255, 77, 77, 0.1); color: var(--neon-red); border: 1px solid var(--neon-red); }
+.badge.yellow { background: rgba(255, 165, 0, 0.1); color: var(--neon-orange); border: 1px solid var(--neon-orange); }
+.badge.blue { background: rgba(0, 136, 255, 0.1); color: var(--neon-blue); border: 1px solid var(--neon-blue); }
+
+.mono-text { font-family: var(--font-mono); font-size: 0.8rem; background: var(--bg-primary); padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); }
+.code-snippet { font-family: var(--font-mono); font-size: 0.8rem; background: var(--bg-primary); padding: 8px; border-radius: 4px; color: var(--neon-cyan); border: 1px dashed var(--border-color); word-break: break-all; }
+
+/* Archive List */
+.archive-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.archive-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid var(--text-muted);
+}
+.archive-item.severity-red { border-left-color: var(--neon-red); }
+.archive-item.severity-yellow { border-left-color: var(--neon-orange); }
+.archive-item.severity-blue { border-left-color: var(--neon-blue); }
+
+.archive-item > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.btn-outline:hover { background: var(--bg-card); border-color: var(--text-main); }
+
+/* Scan Progress */
+.scan-progress-bar {
+    width: 200px;
+    height: 6px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-left: auto;
+}
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--neon-cyan);
+    transition: width 0.5s ease-out;
+}
+.terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}

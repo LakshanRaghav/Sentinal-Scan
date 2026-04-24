@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SentinelScan | Security Audit</title>
+    <title>SentinelScan | Enterprise Security Audit</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <!-- PDF Export Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,9 +19,9 @@
                 <h2>SentinelScan</h2>
             </div>
             <nav>
-                <a href="#" class="active"><i data-lucide="layout-dashboard"></i> Dashboard</a>
-                <a href="#"><i data-lucide="radar"></i> Live Scan</a>
-                <a href="#"><i data-lucide="archive"></i> Archive</a>
+                <a href="#" id="nav-live" class="active"><i data-lucide="radar"></i> Live Scan</a>
+                <a href="#" id="nav-dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+                <a href="#" id="nav-archive"><i data-lucide="archive"></i> Archive</a>
             </nav>
         </aside>
 
@@ -27,19 +29,19 @@
         <main class="main-content">
             <header class="topbar">
                 <div class="title-group">
-                    <h1>Orbital Scan Node</h1>
-                    <span class="badge status-active">System Online</span>
+                    <h1>Orbital Scan Node v2.0</h1>
+                    <span class="badge status-active" id="system-status">System Online</span>
                 </div>
             </header>
 
             <!-- Scan Entry State -->
             <section id="scan-entry" class="view-state active">
                 <div class="scan-prompt">
-                    <h2>Initiate Security Audit</h2>
-                    <p>Enter the target environment to begin deep vulnerability analysis.</p>
+                    <h2>Initiate Deep Security Audit</h2>
+                    <p>Enter the target environment to begin micro-service reconnaissance.</p>
                     <div class="input-group">
                         <i data-lucide="globe"></i>
-                        <input type="url" id="target-url" placeholder="https://dev.example-app.com" autocomplete="off" />
+                        <input type="url" id="target-url" placeholder="https://example.com" autocomplete="off" />
                         <button id="btn-scan" class="btn btn-primary">INITIATE SCAN</button>
                     </div>
                 </div>
@@ -48,6 +50,7 @@
                 <div class="terminal-container" id="live-feed">
                     <div class="terminal-header">
                         <span>LIVE INTELLIGENCE FEED</span>
+                        <div class="scan-progress-bar"><div class="progress-fill" id="scan-progress"></div></div>
                     </div>
                     <div class="terminal-body" id="terminal-logs">
                         <div class="log-line">> Awaiting target system...</div>
@@ -57,76 +60,90 @@
 
             <!-- Dashboard State -->
             <section id="dashboard" class="view-state hidden">
-                <div class="executive-summary-card">
-                    <div class="summary-content">
-                        <h3>Executive Summary</h3>
-                        <p id="exec-summary-text">Analyzing...</p>
-                        <div class="verdict-line">
-                            <span class="verdict-label">Status Verdict:</span>
-                            <strong id="verdict-text">Pending</strong>
+                <div class="dashboard-header-actions">
+                    <button id="btn-export-pdf" class="btn btn-secondary"><i data-lucide="download"></i> Export PDF</button>
+                </div>
+                <div id="dashboard-content">
+                    <div class="executive-summary-card">
+                        <div class="summary-content">
+                            <h3>Executive Summary</h3>
+                            <p id="exec-summary-text">Analyzing...</p>
+                            <div class="verdict-line">
+                                <span class="verdict-label">Status Verdict:</span>
+                                <strong id="verdict-text">Pending</strong>
+                            </div>
+                        </div>
+                        <div class="action-highlight">
+                            <span>Highest Priority</span>
+                            <h4 id="priority-action">Analyzing...</h4>
                         </div>
                     </div>
-                    <div class="action-highlight">
-                        <span>Highest Priority</span>
-                        <h4 id="priority-action">Analyzing...</h4>
+
+                    <div class="metrics-grid">
+                        <!-- Circular Risk Meter -->
+                        <div class="metric-card risk-meter-card">
+                            <h3>Aggregated Risk Level</h3>
+                            <div class="circular-meter">
+                                <svg class="progress-ring" height="160" width="160">
+                                  <circle class="progress-ring__circle default" stroke-width="8" fill="transparent" r="70" cx="80" cy="80"/>
+                                  <circle class="progress-ring__circle value" id="risk-svg" stroke-width="8" fill="transparent" r="70" cx="80" cy="80"/>
+                                </svg>
+                                <div class="meter-text">
+                                    <span id="risk-score">--</span>
+                                    <span class="meter-label" id="risk-label">Analyzing</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Stats Area -->
+                        <div class="stats-area" id="findings-summary">
+                            <div class="stat-box error">
+                                <i data-lucide="alert-octagon"></i>
+                                <div>
+                                    <span class="stat-num" id="stat-critical">0</span>
+                                    <span class="stat-label">Critical Risks</span>
+                                </div>
+                            </div>
+                            <div class="stat-box warning">
+                                <i data-lucide="alert-triangle"></i>
+                                <div>
+                                    <span class="stat-num" id="stat-high">0</span>
+                                    <span class="stat-label">High Threats</span>
+                                </div>
+                            </div>
+                            <div class="stat-box info">
+                                <i data-lucide="info"></i>
+                                <div>
+                                    <span class="stat-num" id="stat-medium">0</span>
+                                    <span class="stat-label">Informational</span>
+                                </div>
+                            </div>
+                            <div class="stat-box success">
+                                <i data-lucide="check-circle"></i>
+                                <div>
+                                    <span class="stat-num" id="stat-low">0</span>
+                                    <span class="stat-label">Passed Checks</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Findings Grid -->
+                    <div class="findings-section">
+                        <h3>Active Vulnerability Mapping</h3>
+                        <div class="findings-grid" id="findings-container">
+                            <!-- Finding Cards injected here -->
+                        </div>
                     </div>
                 </div>
+            </section>
 
-                <div class="metrics-grid">
-                    <!-- Circular Risk Meter -->
-                    <div class="metric-card risk-meter-card">
-                        <h3>Aggregated Risk Level</h3>
-                        <div class="circular-meter">
-                            <svg class="progress-ring" height="160" width="160">
-                              <circle class="progress-ring__circle default" stroke-width="8" fill="transparent" r="70" cx="80" cy="80"/>
-                              <circle class="progress-ring__circle value" id="risk-svg" stroke-width="8" fill="transparent" r="70" cx="80" cy="80"/>
-                            </svg>
-                            <div class="meter-text">
-                                <span id="risk-score">--</span>
-                                <span class="meter-label" id="risk-label">Analyzing</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Stats Area -->
-                    <div class="stats-area" id="findings-summary">
-                        <div class="stat-box error">
-                            <i data-lucide="alert-octagon"></i>
-                            <div>
-                                <span class="stat-num" id="stat-critical">0</span>
-                                <span class="stat-label">Critical Risks</span>
-                            </div>
-                        </div>
-                        <div class="stat-box warning">
-                            <i data-lucide="alert-triangle"></i>
-                            <div>
-                                <span class="stat-num" id="stat-high">0</span>
-                                <span class="stat-label">High Threats</span>
-                            </div>
-                        </div>
-                        <div class="stat-box info">
-                            <i data-lucide="info"></i>
-                            <div>
-                                <span class="stat-num" id="stat-medium">0</span>
-                                <span class="stat-label">Medium Leaks</span>
-                            </div>
-                        </div>
-                        <div class="stat-box success">
-                            <i data-lucide="check-circle"></i>
-                            <div>
-                                <span class="stat-num" id="stat-low">0</span>
-                                <span class="stat-label">Low Priority</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Findings Grid -->
-                <div class="findings-section">
-                    <h3>Active Vulnerability Mapping</h3>
-                    <div class="findings-grid" id="findings-container">
-                        <!-- Finding Cards injected here -->
-                    </div>
+            <!-- Archive State -->
+            <section id="archive" class="view-state hidden">
+                <h2>Scan History</h2>
+                <p>Past scans are securely stored locally in your browser.</p>
+                <div class="archive-list" id="archive-container">
+                    <!-- Archive Items injected here -->
                 </div>
             </section>
         </main>

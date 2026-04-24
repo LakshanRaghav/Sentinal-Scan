@@ -1,5 +1,3 @@
-// Config loaded via <script> tag
-
 // Initialize Icons safely
 try {
     if (typeof lucide !== 'undefined') {
@@ -15,6 +13,13 @@ const urlInput = document.getElementById('target-url');
 const terminalLogs = document.getElementById('terminal-logs');
 const viewEntry = document.getElementById('scan-entry');
 const viewDashboard = document.getElementById('dashboard');
+const viewArchive = document.getElementById('archive');
+const progressBar = document.getElementById('scan-progress');
+
+// Nav Elements
+const navLive = document.getElementById('nav-live');
+const navDashboard = document.getElementById('nav-dashboard');
+const navArchive = document.getElementById('nav-archive');
 
 // Dashboard Elements
 const execSummaryText = document.getElementById('exec-summary-text');
@@ -24,12 +29,16 @@ const riskScore = document.getElementById('risk-score');
 const riskLabel = document.getElementById('risk-label');
 const riskSvg = document.getElementById('risk-svg');
 const findingsContainer = document.getElementById('findings-container');
+const btnExportPdf = document.getElementById('btn-export-pdf');
 
 // Stat Elements
 const statCrit = document.getElementById('stat-critical');
 const statHigh = document.getElementById('stat-high');
 const statMed = document.getElementById('stat-medium');
 const statLow = document.getElementById('stat-low');
+
+// Archive Elements
+const archiveContainer = document.getElementById('archive-container');
 
 // Modal Elements
 const modal = document.getElementById('fix-modal');
@@ -40,6 +49,33 @@ const modalTime = document.getElementById('modal-time');
 
 modalClose.addEventListener('click', () => modal.classList.add('hidden'));
 
+// --- VIEW ROUTER ---
+function switchView(view) {
+    viewEntry.classList.add('hidden');
+    viewDashboard.classList.add('hidden');
+    viewArchive.classList.add('hidden');
+    navLive.classList.remove('active');
+    navDashboard.classList.remove('active');
+    navArchive.classList.remove('active');
+
+    if (view === 'live') {
+        viewEntry.classList.remove('hidden');
+        navLive.classList.add('active');
+    } else if (view === 'dashboard') {
+        viewDashboard.classList.remove('hidden');
+        navDashboard.classList.add('active');
+    } else if (view === 'archive') {
+        viewArchive.classList.remove('hidden');
+        navArchive.classList.add('active');
+        renderArchive();
+    }
+}
+
+navLive.addEventListener('click', () => switchView('live'));
+navDashboard.addEventListener('click', () => switchView('dashboard'));
+navArchive.addEventListener('click', () => switchView('archive'));
+
+// --- TERMINAL LOGGER ---
 function logTerminal(message, type = '') {
     const time = new Date().toISOString().split('T')[1].substring(0, 8);
     const id = type ? `[${type.toUpperCase()}]` : '[SYSTEM]';
@@ -50,50 +86,109 @@ function logTerminal(message, type = '') {
     terminalLogs.scrollTop = terminalLogs.scrollHeight;
 }
 
-// Call local API (which fetches real data and hits NVIDIA)
+// --- SCAN ORCHESTRATOR ---
 async function performScan(url) {
     btnScan.disabled = true;
     btnScan.innerText = "SCANNING...";
     terminalLogs.innerHTML = '';
+    progressBar.style.width = '0%';
+    
+    let aggregatedFindings = [];
+    let progress = 0;
+
+    const updateProgress = (val) => {
+        progress += val;
+        progressBar.style.width = `${progress}%`;
+    };
 
     try {
-        const response = await fetch("/api/analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ targetUrl: url })
+        logTerminal(`Initializing Orbital Scan on ${url}...`, 'info');
+
+        // 1. SSL Audit
+        logTerminal(`Verifying TLS/SSL Certificate Chain...`);
+        try {
+            const sslRes = await fetch('/api/recon/ssl', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({targetUrl: url}) });
+            const sslData = await sslRes.json();
+            if(sslData.findings) aggregatedFindings.push(...sslData.findings);
+            logTerminal(`[SSL] Checked issuer: ${sslData.sslInfo?.issuer || 'Unknown'}`, 'success');
+        } catch(e) { logTerminal(`[SSL] Module Error`, 'warning'); }
+        updateProgress(15);
+
+        // 2. DNS Analysis
+        logTerminal(`Querying DNS, SPF, DMARC records...`);
+        try {
+            const dnsRes = await fetch('/api/recon/dns', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({targetUrl: url}) });
+            const dnsData = await dnsRes.json();
+            if(dnsData.findings) aggregatedFindings.push(...dnsData.findings);
+            logTerminal(`[DNS] Resolved MX and TXT records`, 'success');
+        } catch(e) { logTerminal(`[DNS] Module Error`, 'warning'); }
+        updateProgress(15);
+
+        // 3. Security Headers
+        logTerminal(`Inspecting HTTP Security Headers and CORS...`);
+        try {
+            const headerRes = await fetch('/api/recon/headers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({targetUrl: url}) });
+            const headerData = await headerRes.json();
+            if(headerData.findings) aggregatedFindings.push(...headerData.findings);
+            logTerminal(`[HEADERS] Response headers analyzed`, 'success');
+        } catch(e) { logTerminal(`[HEADERS] Module Error`, 'warning'); }
+        updateProgress(15);
+
+        // 4. Tech Stack Fingerprinting
+        logTerminal(`Fingerprinting Web Application Framework...`);
+        try {
+            const techRes = await fetch('/api/recon/techstack', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({targetUrl: url}) });
+            const techData = await techRes.json();
+            if(techData.findings) aggregatedFindings.push(...techData.findings);
+            logTerminal(`[STACK] Detected: ${techData.techStack?.join(', ') || 'Unknown'}`, 'success');
+        } catch(e) { logTerminal(`[STACK] Module Error`, 'warning'); }
+        updateProgress(15);
+
+        // 5. Subdomain Enumeration
+        logTerminal(`Searching crt.sh for exposed subdomains...`);
+        try {
+            const subRes = await fetch('/api/recon/subdomains', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({targetUrl: url}) });
+            const subData = await subRes.json();
+            if(subData.findings) aggregatedFindings.push(...subData.findings);
+            logTerminal(`[SUBDOMAINS] Found ${subData.subdomains?.length || 0} external nodes`, 'success');
+        } catch(e) { logTerminal(`[SUBDOMAINS] Module Error`, 'warning'); }
+        updateProgress(15);
+
+        // 6. DAST
+        logTerminal(`Running lightweight DAST payloads (XSS, SQLi, LFI)...`);
+        try {
+            const dastRes = await fetch('/api/recon/dast', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({targetUrl: url}) });
+            const dastData = await dastRes.json();
+            if(dastData.findings) aggregatedFindings.push(...dastData.findings);
+            logTerminal(`[DAST] Payload injection sequence complete`, 'success');
+        } catch(e) { logTerminal(`[DAST] Module Error`, 'warning'); }
+        updateProgress(10);
+
+        // 7. AI Analysis
+        logTerminal(`Transmitting aggregated intelligence to Neural Core...`, 'info');
+        const aiRes = await fetch('/api/analyze', { 
+            method: 'POST', 
+            headers: {'Content-Type':'application/json'}, 
+            body: JSON.stringify({targetUrl: url, aggregatedData: aggregatedFindings}) 
         });
+        
+        if(!aiRes.ok) throw new Error('AI Analysis failed');
+        const aiData = await aiRes.json();
+        
+        updateProgress(15);
+        logTerminal(`Neural Analysis Complete. Rendering Dashboard...`, 'success');
 
-        if (!response.ok) {
-            throw new Error(`API returned ${response.status}`);
-        }
+        const finalReport = aiData.report;
+        finalReport.targetUrl = url;
+        finalReport.timestamp = new Date().toISOString();
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
+        // Save to Archive
+        saveToArchive(finalReport);
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            let lines = buffer.split('\n');
-            buffer = lines.pop(); // keep remainder
-
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const data = JSON.parse(line);
-                    if (data.type === "log") {
-                        logTerminal(data.message, data.level);
-                    } else if (data.type === "report") {
-                        logTerminal(`Neural Analysis Complete. Rendering Dashboard...`, 'success');
-                        setTimeout(() => renderDashboard(data.data), 1000);
-                    }
-                } catch(e) {
-                    console.error("Parse error on chunk:", line);
-                }
-            }
-        }
+        setTimeout(() => {
+            renderDashboard(finalReport);
+            switchView('dashboard');
+        }, 1000);
 
     } catch (error) {
         logTerminal(`SCAN FAILED: ${error.message}`, 'error');
@@ -103,7 +198,53 @@ async function performScan(url) {
     btnScan.innerText = "INITIATE SCAN";
 }
 
-// Update SVG Circle progress
+// --- ARCHIVE SYSTEM ---
+function saveToArchive(report) {
+    try {
+        let archive = JSON.parse(localStorage.getItem('sentinelArchive') || '[]');
+        archive.unshift(report); // Add to beginning
+        if(archive.length > 20) archive.pop(); // Keep last 20
+        localStorage.setItem('sentinelArchive', JSON.stringify(archive));
+    } catch(e) {
+        console.error("Local storage error", e);
+    }
+}
+
+function renderArchive() {
+    archiveContainer.innerHTML = '';
+    let archive = [];
+    try {
+        archive = JSON.parse(localStorage.getItem('sentinelArchive') || '[]');
+    } catch(e) {}
+
+    if (archive.length === 0) {
+        archiveContainer.innerHTML = '<p style="color: var(--text-muted)">No past scans found.</p>';
+        return;
+    }
+
+    archive.forEach((report, index) => {
+        const date = new Date(report.timestamp).toLocaleString();
+        const card = document.createElement('div');
+        card.className = `finding-card ${report.overall_severity.toLowerCase() === 'red' ? 'critical' : report.overall_severity.toLowerCase() === 'yellow' ? 'high' : 'low'}`;
+        card.style.cursor = 'pointer';
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0; color: #fff;">${report.targetUrl}</h4>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${date}</span>
+                </div>
+                <span class="finding-badge ${report.overall_severity.toLowerCase() === 'red' ? 'critical' : report.overall_severity.toLowerCase() === 'yellow' ? 'high' : 'low'}">${report.overall_severity} Risk</span>
+            </div>
+        `;
+        card.addEventListener('click', () => {
+            renderDashboard(report);
+            switchView('dashboard');
+        });
+        archiveContainer.appendChild(card);
+    });
+}
+
+// --- DASHBOARD RENDERER ---
 function setProgress(percent, colorVar) {
     const radius = riskSvg.r.baseVal.value;
     const circumference = radius * 2 * Math.PI;
@@ -113,11 +254,7 @@ function setProgress(percent, colorVar) {
     riskSvg.style.stroke = `var(${colorVar})`;
 }
 
-// Render the results into the DOM
 function renderDashboard(report) {
-    viewEntry.classList.add('hidden');
-    viewDashboard.classList.remove('hidden');
-
     execSummaryText.innerText = report.executive_summary;
     verdictText.innerText = report.risk_verdict;
     priorityAction.innerText = report.priority_action;
@@ -136,20 +273,19 @@ function renderDashboard(report) {
     let cCount=0, hCount=0, mCount=0, lCount=0;
 
     if (!report.findings || report.findings.length === 0) {
-        // Fallback for secure sites
         findingsContainer.innerHTML = '<p style="color:var(--neon-blue)">No vulnerabilities detected on this scan vector.</p>';
     }
 
     report.findings.forEach(vuln => {
-        if (!vuln.title || vuln.title.toLowerCase() === 'none' || vuln.what_it_is.toLowerCase() === 'none' || vuln.title.toLowerCase().includes('secure')) {
-            return;
-        }
+        if (!vuln.title || vuln.title.toLowerCase() === 'none' || vuln.what_it_is.toLowerCase() === 'none') return;
 
         const card = document.createElement('div');
         let sevClass = 'low';
         if(vuln.severity === 'RED') { sevClass = 'critical'; cCount++; }
         else if(vuln.severity === 'YELLOW') { sevClass = 'high'; hCount++; }
+        else if(vuln.severity === 'BLUE') { sevClass = 'info'; mCount++; }
         else { sevClass = 'low'; lCount++; }
+        
         card.className = `finding-card ${sevClass}`;
 
         card.innerHTML = `
@@ -158,34 +294,25 @@ function renderDashboard(report) {
                     <h4 class="finding-title">${vuln.title}</h4>
                     <span class="finding-badge ${sevClass}">${vuln.severity}</span>
                 </div>
-                <i data-lucide="${sevClass === 'critical' ? 'alert-octagon' : 'alert-triangle'}"></i>
+                <i data-lucide="${sevClass === 'critical' ? 'alert-octagon' : sevClass === 'high' ? 'alert-triangle' : 'info'}"></i>
             </div>
             <p class="finding-desc">${vuln.what_it_is}</p>
             <p class="finding-why">"${vuln.why_dangerous}"</p>
             ${vuln.exposed_value_preview ? `<div class="finding-preview">Evidence: ${vuln.exposed_value_preview}</div>` : ''}
-            ${vuln.location ? `<div class="finding-location" style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);"><i data-lucide="map-pin" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><strong>Location:</strong> <a href="${vuln.location}" target="_blank" style="color: inherit;">${vuln.location}</a></div>` : ''}
-            ${(vuln.status_code || vuln.response_time || vuln.file_size || vuln.confidence_score) ? `
-            <div class="finding-meta" style="display: flex; gap: 15px; margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap;">
-                ${vuln.status_code ? `<span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="activity" style="width: 14px; height: 14px;"></i> ${vuln.status_code} OK</span>` : ''}
-                ${vuln.response_time ? `<span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="clock" style="width: 14px; height: 14px;"></i> ${vuln.response_time}</span>` : ''}
-                ${vuln.file_size ? `<span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="file" style="width: 14px; height: 14px;"></i> ${vuln.file_size}</span>` : ''}
-                ${vuln.confidence_score ? `<span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="percent" style="width: 14px; height: 14px;"></i> ${vuln.confidence_score}% Confidence</span>` : ''}
-            </div>` : ''}
-            ${(vuln.fix_steps && vuln.fix_steps.length > 0) ? `<button class="btn-fix" style="margin-top: 15px;">HOW TO FIX</button>` : ''}
+            ${vuln.location ? `<div class="finding-location" style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);"><strong>Location:</strong> ${vuln.location}</div>` : ''}
+            ${(vuln.fix_steps && vuln.fix_steps.length > 0) ? `<button class="btn-fix" style="margin-top: 15px;">REMEDIATION</button>` : ''}
         `;
 
         const fixBtn = card.querySelector('.btn-fix');
         if (fixBtn) {
             fixBtn.addEventListener('click', () => {
                 modalTitle.innerText = vuln.title;
-                modalTime.innerText = vuln.fix_time || 'Unknown';
+                modalTime.innerText = vuln.fix_time || 'N/A';
                 modalTitle.style.color = `var(--neon-${sevClass === 'critical' ? 'red' : sevClass === 'high' ? 'orange' : 'cyan'})`;
-
                 modalSteps.innerHTML = vuln.fix_steps.map(step => `<li>${step}</li>`).join('');
                 modal.classList.remove('hidden');
             });
         }
-
         findingsContainer.appendChild(card);
     });
 
@@ -197,6 +324,29 @@ function renderDashboard(report) {
     lucide.createIcons();
 }
 
+// --- PDF EXPORT ---
+btnExportPdf.addEventListener('click', () => {
+    const element = document.getElementById('dashboard-content');
+    const opt = {
+      margin:       0.5,
+      filename:     'SentinelScan_Report.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#09090b' },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    // Temporarily adjust styles for better PDF output
+    const originalBg = element.style.background;
+    element.style.background = '#09090b';
+    element.style.padding = '20px';
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+        element.style.background = originalBg;
+        element.style.padding = '0';
+    });
+});
+
+// --- INIT ---
 btnScan.addEventListener('click', () => {
     let url = urlInput.value.trim();
     if(url) {

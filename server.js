@@ -44,8 +44,8 @@ const PORT = 3000;
 const server = http.createServer(async (req, res) => {
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
 
-  // API endpoint
-  if (req.url === '/api/analyze' && req.method === 'POST') {
+  // API endpoints
+  if (req.url.startsWith('/api/') && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => {
       body += chunk.toString();
@@ -53,8 +53,19 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         req.body = JSON.parse(body);
-        console.log('Route matched: /api/analyze');
-        await analyze(req, res);
+        console.log(`Route matched: ${req.url}`);
+        
+        // Route dynamically based on URL
+        if (req.url === '/api/analyze') {
+          await analyze(req, res);
+        } else if (req.url.startsWith('/api/recon/')) {
+          const endpoint = req.url.split('/').pop();
+          const handler = await import(`./api/recon/${endpoint}.js`);
+          await handler.default(req, res);
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'API route not found' }));
+        }
       } catch (e) {
         console.error('Error:', e.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
