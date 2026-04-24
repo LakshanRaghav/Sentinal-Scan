@@ -83,6 +83,12 @@ nav a:hover, nav a.active {
     padding: 32px 48px;
 }
 
+#dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
 .topbar {
     display: flex;
     justify-content: space-between;

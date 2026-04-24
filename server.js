@@ -44,6 +44,16 @@ const PORT = 3000;
 const server = http.createServer(async (req, res) => {
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
 
+  // Shim Vercel helpers for local dev
+  res.status = (statusCode) => {
+    res.statusCode = statusCode;
+    return res;
+  };
+  res.json = (data) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(data));
+  };
+
   // API endpoints
   if (req.url.startsWith('/api/') && req.method === 'POST') {
     let body = '';

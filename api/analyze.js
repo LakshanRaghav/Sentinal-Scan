@@ -13,7 +13,7 @@ CORE RULES:
 4. If there are NO major vulnerabilities, rate the overall severity as BLUE. Do NOT hallucinate.
 5. Trust the provided JSON data. Do not invent vulnerabilities that aren't in the input.
 
-OUTPUT FORMAT — Always respond in EXACT JSON structure:
+OUTPUT FORMAT — ALWAYS RESPOND IN EXACT JSON STRUCTURE ONLY. DO NOT WRAP THE RESPONSE IN MARKDOWN BACKTICKS (e.g. \`\`\`json). JUST RETURN THE RAW JSON OBJECT.
 {
   "executive_summary": "plain English, 3-4 sentences summarizing the security posture.",
   "risk_score": 85,
@@ -48,7 +48,7 @@ async function callNvidiaAPI(scanData) {
       { role: "user", content: `Analyze this aggregated security scan data: ${JSON.stringify(scanData)}` }
     ],
     temperature: 0.2,
-    max_tokens: 2048
+    max_tokens: 3000
   }, {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -77,10 +77,17 @@ export default async (req, res) => {
     const aiResponse = await callNvidiaAPI({ target: targetUrl, data: aggregatedData });
     let report;
     try {
-      report = JSON.parse(aiResponse);
+      // Strip markdown JSON wrapping if the AI ignored instructions
+      let cleanResponse = aiResponse.trim();
+      if (cleanResponse.startsWith('```json')) cleanResponse = cleanResponse.substring(7);
+      if (cleanResponse.startsWith('```')) cleanResponse = cleanResponse.substring(3);
+      if (cleanResponse.endsWith('```')) cleanResponse = cleanResponse.substring(0, cleanResponse.length - 3);
+      
+      report = JSON.parse(cleanResponse.trim());
     } catch (e) {
+      console.error('JSON Parse Error:', e, 'Raw AI Response:', aiResponse);
       report = {
-        executive_summary: "AI analysis completed but returned invalid format.",
+        executive_summary: "AI analysis completed but returned invalid format. See logs.",
         risk_score: 50,
         risk_verdict: "Unable to determine risk level.",
         overall_severity: "BLUE",
