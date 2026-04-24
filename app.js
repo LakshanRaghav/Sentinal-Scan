@@ -93,6 +93,9 @@ async function performScan(url) {
     terminalLogs.innerHTML = '';
     progressBar.style.width = '0%';
     
+    const dinoContainer = document.getElementById('dino-container');
+    if (dinoContainer) dinoContainer.classList.remove('hidden');
+    
     let aggregatedFindings = [];
     let progress = 0;
 
@@ -191,8 +194,11 @@ async function performScan(url) {
         }, 1000);
 
     } catch (error) {
-        logTerminal(`SCAN FAILED: ${error.message}`, 'error');
+        logTerminal(\`SCAN FAILED: \${error.message}\`, 'error');
     }
+
+    const dinoContainer = document.getElementById('dino-container');
+    if (dinoContainer) dinoContainer.classList.add('hidden');
 
     btnScan.disabled = false;
     btnScan.innerText = "INITIATE SCAN";
