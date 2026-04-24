@@ -262,6 +262,7 @@ function setProgress(percent, colorVar) {
 }
 
 function renderDashboard(report) {
+    window.currentReportData = report; // Store for PDF export
     execSummaryText.innerText = report.executive_summary;
     verdictText.innerText = report.risk_verdict;
     priorityAction.innerText = report.priority_action;
@@ -370,25 +371,71 @@ function renderDashboard(report) {
 
 // --- PDF EXPORT ---
 btnExportPdf.addEventListener('click', () => {
-    const element = document.getElementById('dashboard-content');
+    if (!window.currentReportData) return;
+    const report = window.currentReportData;
+
+    const printContainer = document.createElement('div');
+    printContainer.style.width = '800px';
+    printContainer.style.padding = '40px';
+    printContainer.style.background = '#ffffff';
+    printContainer.style.color = '#000000';
+    printContainer.style.fontFamily = 'Arial, sans-serif';
+    printContainer.style.position = 'absolute';
+    printContainer.style.left = '-9999px';
+    printContainer.style.top = '0';
     
-    element.classList.add('pdf-export-mode');
+    let findingsHTML = '';
+    report.findings.forEach(vuln => {
+        if (!vuln.title || vuln.title.toLowerCase() === 'none') return;
+        const color = vuln.severity?.toUpperCase() === 'CRITICAL' ? '#d32f2f' : vuln.severity?.toUpperCase() === 'HIGH' ? '#f57c00' : '#1976d2';
+        findingsHTML += \`
+            <div style="margin-bottom: 20px; page-break-inside: avoid; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: \${color};">\${vuln.title} [\${vuln.severity}]</h4>
+                <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.4;"><strong>Impact:</strong> \${vuln.impact}</p>
+                \${vuln.affected_component ? \`<p style="margin: 0 0 10px 0; font-size: 14px;"><strong>Location:</strong> \${vuln.affected_component}</p>\` : ''}
+                \${vuln.remediation && vuln.remediation.length > 0 ? \`<p style="margin: 0; font-size: 14px; line-height: 1.4;"><strong>Remediation:</strong> \${vuln.remediation.join(', ')}</p>\` : ''}
+            </div>
+        \`;
+    });
+
+    printContainer.innerHTML = \`
+        <div style="text-align: center; margin-bottom: 40px; border-bottom: 2px solid #000; padding-bottom: 20px;">
+            <h1 style="margin: 0; color: #000;">SentinelScan Security Audit</h1>
+            <p style="color: #666; margin-top: 5px;">Target: \${report.targetUrl || 'Unknown'} | Date: \${new Date(report.timestamp || Date.now()).toLocaleString()}</p>
+        </div>
+        
+        <div style="margin-bottom: 40px;">
+            <h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; color: #000;">Executive Summary</h2>
+            <p style="line-height: 1.5;">\${report.executive_summary}</p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin-top: 15px;">
+                <p style="margin: 0 0 5px 0;"><strong>Verdict:</strong> \${report.risk_verdict}</p>
+                <p style="margin: 0;"><strong>Risk Score:</strong> \${report.risk_score}/100 (\${report.overall_severity})</p>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 40px;">
+            <h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; color: #000;">Vulnerability Findings</h2>
+            \${findingsHTML || '<p>No vulnerabilities detected on this scan vector.</p>'}
+        </div>
+    \`;
+    
+    document.body.appendChild(printContainer);
     
     const opt = {
-      margin:       [0.5, 0.5, 0.5, 0.5],
+      margin:       0.5,
       filename:     'SentinelScan_Report.pdf',
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#09090b', windowWidth: 1200 },
+      html2canvas:  { scale: 2, useCORS: true },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
       pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
     
-    const originalBg = element.style.background;
-    element.style.background = '#09090b';
+    const originalText = btnExportPdf.innerHTML;
+    btnExportPdf.innerHTML = 'Exporting...';
     
-    html2pdf().set(opt).from(element).save().then(() => {
-        element.style.background = originalBg;
-        element.classList.remove('pdf-export-mode');
+    html2pdf().set(opt).from(printContainer).save().then(() => {
+        document.body.removeChild(printContainer);
+        btnExportPdf.innerHTML = originalText;
     });
 });
 
