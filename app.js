@@ -198,7 +198,6 @@ async function performScan(url) {
         logTerminal(`SCAN FAILED: ${error.message}`, 'error');
     }
 
-    const dinoContainer = document.getElementById('dino-container');
     if (dinoContainer) dinoContainer.classList.add('hidden');
 
     btnScan.disabled = false;
