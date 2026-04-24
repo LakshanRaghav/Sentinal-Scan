@@ -59,17 +59,30 @@ export default async (req, res) => {
         techStack.push(`WordPress v${wpVersion}`);
         findings.push({ title: 'WordPress Version Exposed', severity: 'YELLOW', what_it_is: `WordPress version ${wpVersion} was detected.`, why_dangerous: 'Exposed versions allow attackers to quickly find known CVEs.', evidence: `WP v${wpVersion}`, fix_steps: ['Remove readme.html and generator meta tags.'] });
         
-        // WPScan CVE Lookup
+        // CVE Lookup (WPScan or free NVD API fallback)
         if (process.env.WPSCAN_API_TOKEN) {
           try {
-            const wpRes = await axios.get(`https://wpscan.com/api/v3/wordpresses/${wpVersion.replace(/\./g, '')}`, {
-              headers: { 'Authorization': `Token ${process.env.WPSCAN_API_TOKEN}` },
+            const wpRes = await axios.get(\`https://wpscan.com/api/v3/wordpresses/\${wpVersion.replace(/\\./g, '')}\`, {
+              headers: { 'Authorization': \`Token \${process.env.WPSCAN_API_TOKEN}\` },
               timeout: 4000
             });
             if (wpRes.data && wpRes.data[wpVersion] && wpRes.data[wpVersion].vulnerabilities) {
               const vulns = wpRes.data[wpVersion].vulnerabilities;
               vulns.forEach(v => {
-                findings.push({ type: 'cms_cve', cve: v.cve ? \`CVE-\${v.cve}\` : null, title: `WP CVE: ${v.title}`, severity: 'CRITICAL', what_it_is: v.title, why_dangerous: 'Known WordPress vulnerability.', fix_steps: ['Update WordPress to the latest version immediately.'] });
+                findings.push({ type: 'cms_cve', cve: v.cve ? \`CVE-\${v.cve}\` : null, title: \`WP CVE: \${v.title}\`, severity: 'CRITICAL', what_it_is: v.title, why_dangerous: 'Known WordPress vulnerability.', fix_steps: ['Update WordPress to the latest version immediately.'] });
+              });
+            }
+          } catch(e) {}
+        } else {
+          // Free NVD API Fallback
+          try {
+            const nvdRes = await axios.get(\`https://services.nvd.nist.gov/rest/json/cves/2.0?cpeName=cpe:2.3:a:wordpress:wordpress:\${wpVersion}:*:*:*:*:*:*:*\`, { timeout: 6000 });
+            if (nvdRes.data && nvdRes.data.vulnerabilities && nvdRes.data.vulnerabilities.length > 0) {
+              const vulns = nvdRes.data.vulnerabilities.slice(0, 5); // Limit to top 5
+              vulns.forEach(v => {
+                const cve = v.cve;
+                const desc = cve.descriptions.find(d => d.lang === 'en')?.value || 'WordPress Vulnerability';
+                findings.push({ type: 'cms_cve', cve: cve.id, title: \`WP \${cve.id}\`, severity: 'CRITICAL', what_it_is: desc.substring(0, 150) + '...', why_dangerous: 'Known WordPress vulnerability found via free NVD Database.', fix_steps: ['Update WordPress to the latest version immediately.'] });
               });
             }
           } catch(e) {}
